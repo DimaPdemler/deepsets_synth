@@ -26,11 +26,7 @@ def choose_deepsets(deepsets_type: str, model_hyperparams: dict) -> keras.models
     for key in model_hyperparams:
         print(f"{key}: {model_hyperparams[key]}")
 
-    # switcher = {
-    #     "invariant": lambda: DeepSetsInv_custom(**model_hyperparams),
-    #     "qinvariant": lambda: DeepSetsInvQuantised(**model_hyperparams),
-    #     "sinvariant": lambda: deepsets_invariant_synth(**model_hyperparams),
-    # }
+
     switcher = {
         "invariant": lambda: DeepSetsInv_custom(**model_hyperparams),
         "qinvariant": lambda: DeepSetsInvQuantised(**model_hyperparams),
@@ -74,41 +70,6 @@ def compile_deepsets(njets: int, input_size: tuple, model: keras.Model, hps: dic
     print(tcols.OKGREEN + "Model compiled and built!" + tcols.ENDC)
 
     return model, model_callbacks
-
-
-# def compile_deepsets(njets: int, input_size: tuple, model: keras.Model, hps: dict):
-#     """Compile the deepsets model architecture in the keras framework.
-
-#     Args:
-#         njets: The total number of jets in the data set.
-#         input_size: Tuple containing the batch size, number of constituents per jet,
-#             and the number of features per constituent, respectively.
-#         model: The model object in keras.
-#         hps: Dictionary with hyperparameters used in compilation process.
-#     """
-#     model_callbacks = []
-#     if "pruning_rate" in hps.keys():
-#         if hps["pruning_rate"] < 0 or hps["pruning_rate"] > 1:
-#             raise ValueError("Given pruning rate is not valid!")
-#         nsteps = njets // input_size[0]
-#         model = prune_model(model, nsteps, hps["pruning_rate"])
-#         model_callbacks.append(pruning_callbacks.UpdatePruningStep())
-
-#     loss = choose_loss(hps["loss"])
-#     optimizer = load_optimizer(hps["optimizer"], **hps["optimizer_hps"])
-
-#     opt_callbacks = hps["optimizer_callbacks"]
-#     early_stopping = keras.callbacks.EarlyStopping(**opt_callbacks["early_stopping"])
-#     lr_decay = keras.callbacks.ReduceLROnPlateau(**opt_callbacks["lr_decay"])
-
-#     model_callbacks.append(early_stopping)
-#     model_callbacks.append(lr_decay)
-
-#     model.compile(loss=loss, optimizer=optimizer, metrics=hps["metrics"])
-#     model.build(input_size)
-#     print(tcols.OKGREEN + "Model compiled and built!" + tcols.ENDC)
-
-#     return model, model_callbacks
 
 
 def load_optimizer(choice: str, **kwargs) -> keras.optimizers.Optimizer:
