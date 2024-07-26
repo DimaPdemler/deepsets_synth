@@ -20,7 +20,7 @@ from fast_deepsets.util.terminal_colors import tcols
 from fast_deepsets.data.data import HLS4MLData150
 
 
-def main(args, synth_config_user: dict): # changed from `synth_config` to `synth_config_user` as it is the user input config
+def main(args, synth_config: dict):
     util.device_info()
     synthesis_dir = util.make_output_directories(args.model_dir, "synthesis")
 
@@ -33,14 +33,7 @@ def main(args, synth_config_user: dict): # changed from `synth_config` to `synth
 
     print(tcols.OKGREEN + "\nCONFIGURING SYNTHESIS\n" + tcols.ENDC)
     synth_config = hls4ml.utils.config_from_keras_model(model, granularity="name")
-    # synth_config.update(synth_config) # Commented out, as it overwrites entirely
-
-    # Updated here
-    synth_config["Model"].update(synth_config_user["Model"]) # Update the model
-
-    for layer in synth_config["LayerName"].keys(): # Update each layer
-        if layer in synth_config_user["LayerName"].keys(): 
-            synth_config["LayerName"][layer].update(synth_config_user["LayerName"][layer])    
+    synth_config.update(synth_config)
 
     model_activations = get_model_activations(model)
     # Set the model activation function rounding and saturation modes.
@@ -64,9 +57,12 @@ def main(args, synth_config_user: dict): # changed from `synth_config` to `synth
     )
 
     hls_model.compile()
+    
+   
     if args.diagnose:
         print(tcols.OKGREEN + "\nRUNNING MODEL DIAGNOSTICS\n" + tcols.ENDC)
-        run_trace(model, hls_model, valid_data.x)
+        run_trace(model, hls_model, valid_data.x, synthesis_dir)
+#         run_trace(model, hls_model, valid_data.x)
         profile_model(model, hls_model, valid_data.x, synthesis_dir)
     hls_model.write()
 
@@ -79,6 +75,10 @@ def main(args, synth_config_user: dict): # changed from `synth_config` to `synth
     print(f"Accuracy model: {acc:.3f}")
     print(f"Accuracy synthed model: {acc_synth:.3f}")
     print(f"Accuracy ratio: {acc_synth/acc:.3f}")
+    
+    
+    hls_model.build(csim=False)
+
 
 
 def import_model(model_dir: str, hyperparams: dict):
@@ -143,40 +143,6 @@ def profile_model(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray,
     )
 
 
-def run_trace(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray, outdir):
-    """Shows output of every layer given a certain sample.
-
-    This is used to compute the outputs in every layer for the hls4ml firmware model
-    against the qkeras model. The outputs of the quantized layers is not quantized
-    itself in the QKERAS model but it is in hls4ml. A big difference in outputs is
-    indicative that the precision of these outputs should be set higher manually
-    in hls4ml.
-    """
-    # Show the weights of the network only for 3 of the samples, as defined below.
-    sample_numbers = [0, 49, 99]
-
-    # Take just the first 100 events of the data set.
-    hls4ml_pred, hls4ml_trace = hls_model.trace(data[:100])
-    keras_trace = hls4ml.model.profiling.get_ymodel_keras(model, data[:100])
-
-    # Write the weights of the hls4ml and qkeras networks for the 3 specified samples.
-    trace_file_path = os.path.join(outdir, "trace_output.log")
-    with open(trace_file_path, "w") as trace_file:
-        for sample_number in samples:
-            for layer in model.layers:
-                if layer.name == "input_layer":
-                    continue
-                trace_file.write(f"Layer output HLS4ML for {layer.name}")
-                trace_file.write(hls4ml_trace[layer.name][sample_number])
-                trace_file.write(f"Layer output KERAS for {layer.name}")
-                trace_file.write(keras_trace[layer.name][sample_number])
-                trace_file.write("\n")
-
-    print(tcols.OKGREEN)
-    print(f"Wrote trace for samples {sample_numbers} to file {trace_file_path}.")
-    print(tcols.ENDC)
-
-
 # def run_trace(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray, outdir):
 #     """Shows output of every layer given a certain sample.
 
@@ -210,6 +176,48 @@ def run_trace(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray, out
 #     print(f"Wrote trace for samples {sample_numbers} to file {trace_file_path}.")
 #     print(tcols.ENDC)
 
+def run_trace(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray, outdir):
+    """Shows output of every layer given a certain sample."""
+    sample_numbers = [0, 49, 99]
+
+    # Take just the first 100 events of the data set.
+    hls4ml_pred, hls4ml_trace = hls_model.trace(data[:100])
+    
+    # Get Keras model outputs manually
+    keras_trace = {}
+    x = data[:100]
+    for layer in model.layers:
+        keras_trace[layer.name] = layer(x)
+        if hasattr(layer, 'activation') and layer.activation is not None:
+            if isinstance(layer.activation, str):
+                activation_func = getattr(tf.nn, layer.activation, None)
+                if activation_func:
+                    keras_trace[layer.name] = activation_func(keras_trace[layer.name])
+            else:
+                keras_trace[layer.name] = layer.activation(keras_trace[layer.name])
+        
+        # Convert to numpy array if it's not already
+        if isinstance(keras_trace[layer.name], tf.Tensor):
+            keras_trace[layer.name] = keras_trace[layer.name].numpy()
+        
+        x = keras_trace[layer.name]
+
+    # Write the weights of the hls4ml and qkeras networks for the 3 specified samples.
+    trace_file_path = os.path.join(outdir, "trace_output.log")
+    with open(trace_file_path, "w") as trace_file:
+        for sample_number in sample_numbers:
+            for layer in model.layers:
+                if layer.name == "input_layer":
+                    continue
+                trace_file.write(f"Layer output HLS4ML for {layer.name}\n")
+                trace_file.write(str(hls4ml_trace[layer.name][sample_number]) + "\n")
+                trace_file.write(f"Layer output KERAS for {layer.name}\n")
+                trace_file.write(str(keras_trace[layer.name][sample_number]) + "\n")
+                trace_file.write("\n")
+
+    print(tcols.OKGREEN)
+    print(f"Wrote trace for samples {sample_numbers} to file {trace_file_path}.")
+    print(tcols.ENDC)
 
 
 def get_model_activations(model: keras.Model):

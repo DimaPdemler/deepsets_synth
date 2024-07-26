@@ -20,7 +20,8 @@ from fast_deepsets.util.terminal_colors import tcols
 from fast_deepsets.deepsets import utilcustom as dsutil
 from fast_deepsets.data.data import HLS4MLData150
 
-from fast_deepsets.deepsets.deepsets import DeepSetsInv_custom
+# from fast_deepsets.deepsets.deepsets import DeepSetsInv_custom
+from fast_deepsets.deepsets.deepsets_synth import deepsets_invariant_synth_custom2
 
 # Set keras float precision. Default is float32.
 # tf.keras.backend.set_floatx("float64")
@@ -57,19 +58,6 @@ def main(config: dict):
         model.set_weights(initial_weights)
         tf.keras.backend.clear_session()
 
-# def build_model(config: dict, njets: int, input_size: tuple):
-#     """Instantiate the model with chosen hyperparams and return it."""
-#     print(tcols.HEADER + "\n\nINSTANTIATING MODEL:" + tcols.ENDC)
-#     config["model_hyperparams"].update({"input_size": input_size})
-#     model = dsutil.choose_deepsets(config["model_type"], config["model_hyperparams"])
-#     model, model_callbacks = dsutil.compile_deepsets(
-#         njets, input_size, model, config["compilation_hyperparams"]
-#     )
-#     model.summary(expand_nested=True)
-#     if not "nbits" in config["model_hyperparams"]:
-#         print(tcols.OKGREEN + f"Model FLOPs: " + tcols.ENDC, sum(model.flops.values()))
-
-#     return model, model_callbacks
 
 
 def build_model(config: dict, njets: int, input_size: tuple):
@@ -78,7 +66,7 @@ def build_model(config: dict, njets: int, input_size: tuple):
     model_params = config["model_hyperparams"]
     model_params.update({"input_size": input_size})
     
-    model = DeepSetsInv_custom(
+    model = deepsets_invariant_synth_custom2(
         input_size=input_size,
         phi_layers=model_params["phi_layers"],
         phi_activations=model_params["phi_activations"],
