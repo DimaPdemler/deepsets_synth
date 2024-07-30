@@ -1,5 +1,5 @@
 ---
-outdir: 'simple_custom_batchnorm'
+outdir: 'synth_small'
 data_hyperparams:
   root: '../data/jetid'
   nconst: 8
@@ -8,7 +8,7 @@ data_hyperparams:
   kfolds: 5
   seed: 511
 
-model_type: "invariant"
+model_type: "sinvariant"
 model_hyperparams:
   phi_layers: [8, 8]
   phi_activations: ["leaky_relu", "relu"]
@@ -20,10 +20,9 @@ model_hyperparams:
   leaky_relu_alpha: 0.01
   aggreg: "mean"
   aggreg_precision:
-    bits: 32
-    integer: 16
+    bits: 20
+    integer: 10
   output_dim: 5
-  nbits: 32
 
 compilation_hyperparams:
   optimizer: "adam"
@@ -32,19 +31,19 @@ compilation_hyperparams:
   optimizer_callbacks:
     early_stopping:
       monitor: "val_categorical_accuracy"
-      patience: 7
+      patience: 20
     lr_decay:
       monitor: "val_categorical_accuracy"
       factor: 0.8
-      patience: 3
+      patience: 10
       min_lr: 0.0001
 
   loss: "softmax_with_crossentropy"
   metrics: ["categorical_accuracy"]
-  early_stopping: 7
+  early_stopping: 20
 
 training_hyperparams:
   batch_size: 256
-  epochs: 50
+  epochs: 10
   shuffle: True
   verbose: 2

@@ -34,6 +34,7 @@ def main(args, synth_config: dict):
     print(tcols.OKGREEN + "\nCONFIGURING SYNTHESIS\n" + tcols.ENDC)
     synth_config = hls4ml.utils.config_from_keras_model(model, granularity="name")
     synth_config.update(synth_config)
+    print(synth_config)
 
     model_activations = get_model_activations(model)
     # Set the model activation function rounding and saturation modes.
@@ -47,6 +48,7 @@ def main(args, synth_config: dict):
         for layer in synth_config["LayerName"].keys():
             synth_config["LayerName"][layer]["Trace"] = True
 
+    
     print(synth_config)
     hls_model = hls4ml.converters.convert_from_keras_model(
         model,
@@ -55,14 +57,24 @@ def main(args, synth_config: dict):
         part="xcvu13p-flga2577-2-e",
         io_type="io_parallel",
     )
+    print("Keras Model Structure:")
+    for layer in model.layers:
+        print(f"Layer: {layer.name}, Type: {type(layer).__name__}")
+    print("****hls4ml step 1: ")
+    for layer in hls_model.get_layers():
+        print(f"Layer: {layer.name}, Type: {type(layer).__name__}")
+    
 
     hls_model.compile()
-    
-   
+
+    # print("****hls4ml step 2: ")
+    # for layer in hls_model.get_layers():
+    #     print(f"Layer: {layer.name}, Type: {type(layer).__name__}")
+
+    assert(0==1)
     if args.diagnose:
         print(tcols.OKGREEN + "\nRUNNING MODEL DIAGNOSTICS\n" + tcols.ENDC)
         run_trace(model, hls_model, valid_data.x, synthesis_dir)
-#         run_trace(model, hls_model, valid_data.x)
         profile_model(model, hls_model, valid_data.x, synthesis_dir)
     hls_model.write()
 
@@ -75,10 +87,6 @@ def main(args, synth_config: dict):
     print(f"Accuracy model: {acc:.3f}")
     print(f"Accuracy synthed model: {acc_synth:.3f}")
     print(f"Accuracy ratio: {acc_synth/acc:.3f}")
-    
-    
-    hls_model.build(csim=False)
-
 
 
 def import_model(model_dir: str, hyperparams: dict):
@@ -176,49 +184,69 @@ def profile_model(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray,
 #     print(f"Wrote trace for samples {sample_numbers} to file {trace_file_path}.")
 #     print(tcols.ENDC)
 
+
+
 def run_trace(model: keras.Model, hls_model: hls4ml.model, data: np.ndarray, outdir):
-    """Shows output of every layer given a certain sample."""
+    """Shows output of every layer given a certain sample, with enhanced diagnostics."""
     sample_numbers = [0, 49, 99]
 
-    # Take just the first 100 events of the data set.
-    hls4ml_pred, hls4ml_trace = hls_model.trace(data[:100])
-    
-    # Get Keras model outputs manually
-    keras_trace = {}
-    x = data[:100]
+    print("Keras Model Structure:")
     for layer in model.layers:
-        keras_trace[layer.name] = layer(x)
-        if hasattr(layer, 'activation') and layer.activation is not None:
-            if isinstance(layer.activation, str):
-                activation_func = getattr(tf.nn, layer.activation, None)
-                if activation_func:
-                    keras_trace[layer.name] = activation_func(keras_trace[layer.name])
-            else:
-                keras_trace[layer.name] = layer.activation(keras_trace[layer.name])
-        
-        # Convert to numpy array if it's not already
-        if isinstance(keras_trace[layer.name], tf.Tensor):
-            keras_trace[layer.name] = keras_trace[layer.name].numpy()
-        
-        x = keras_trace[layer.name]
+        print(f"Layer: {layer.name}, Type: {type(layer).__name__}")
 
-    # Write the weights of the hls4ml and qkeras networks for the 3 specified samples.
+    print("\nhls4ml Model Structure:")
+    for layer in hls_model.get_layers():
+        print(f"Layer: {layer.name}, Type: {type(layer).__name__}")
+
+    hls4ml_pred, hls4ml_trace = hls_model.trace(data[:100])
+    print("\nHLS4ML trace keys:", hls4ml_trace.keys())
+    
+    try:
+        keras_trace = hls4ml.model.profiling.get_ymodel_keras(model, data[:100])
+        print("Keras trace keys:", keras_trace.keys())
+    except AttributeError as e:
+        print(f"Error in get_ymodel_keras: {e}")
+        print("Continuing without Keras trace...")
+        keras_trace = {}
+
     trace_file_path = os.path.join(outdir, "trace_output.log")
     with open(trace_file_path, "w") as trace_file:
+        trace_file.write("Model Layer Structure:\n")
+        for layer in model.layers:
+            trace_file.write(f"Layer: {layer.name}, Type: {type(layer).__name__}\n")
+        trace_file.write("\nHLS4ML Layer Structure:\n")
+        for layer in hls_model.get_layers():
+            trace_file.write(f"Layer: {layer.name}, Type: {type(layer).__name__}\n")
+        trace_file.write("\n")
+
         for sample_number in sample_numbers:
             for layer in model.layers:
                 if layer.name == "input_layer":
                     continue
-                trace_file.write(f"Layer output HLS4ML for {layer.name}\n")
-                trace_file.write(str(hls4ml_trace[layer.name][sample_number]) + "\n")
-                trace_file.write(f"Layer output KERAS for {layer.name}\n")
-                trace_file.write(str(keras_trace[layer.name][sample_number]) + "\n")
+                trace_file.write(f"Layer: {layer.name}\n")
+                
+                if layer.name in hls4ml_trace:
+                    trace_file.write(f"HLS4ML output:\n")
+                    trace_file.write(str(hls4ml_trace[layer.name][sample_number]) + "\n")
+                else:
+                    trace_file.write(f"HLS4ML output not available for this layer (Type: {type(layer).__name__})\n")
+                
+                if layer.name in keras_trace:
+                    trace_file.write(f"Keras output:\n")
+                    trace_file.write(str(keras_trace[layer.name][sample_number]) + "\n")
+                else:
+                    trace_file.write(f"Keras output not available for this layer (Type: {type(layer).__name__})\n")
+                
                 trace_file.write("\n")
 
     print(tcols.OKGREEN)
     print(f"Wrote trace for samples {sample_numbers} to file {trace_file_path}.")
     print(tcols.ENDC)
 
+    print("\nLayers present in Keras model but missing in hls4ml trace:")
+    for layer in model.layers:
+        if layer.name not in hls4ml_trace:
+            print(f"Missing: {layer.name}, Type: {type(layer).__name__}")
 
 def get_model_activations(model: keras.Model):
     """Looks at the layers in a model and returns a list with all the activations.

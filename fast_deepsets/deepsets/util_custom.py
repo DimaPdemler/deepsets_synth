@@ -9,9 +9,8 @@ from tensorflow import keras
 import tensorflow_model_optimization as tfmot
 from tensorflow_model_optimization.sparsity import keras as sparsity
 
-from fast_deepsets.deepsets.deepsets import DeepSetsInv_custom
+from fast_deepsets.deepsets.deepsets import DeepSetsInv
 from fast_deepsets.deepsets.deepsets_quantised import DeepSetsInvQuantised
-# from fast_deepsets.deepsets.deepsets_synth import deepsets_invariant_synth
 from fast_deepsets.deepsets.deepsets_synth import deepsets_invariant_synth_custom2
 from fast_deepsets.util.terminal_colors import tcols
 
@@ -27,9 +26,8 @@ def choose_deepsets(deepsets_type: str, model_hyperparams: dict) -> keras.models
     for key in model_hyperparams:
         print(f"{key}: {model_hyperparams[key]}")
 
-
     switcher = {
-        "invariant": lambda: DeepSetsInv_custom(**model_hyperparams),
+        "invariant": lambda: DeepSetsInv(**model_hyperparams),
         "qinvariant": lambda: DeepSetsInvQuantised(**model_hyperparams),
         "sinvariant": lambda: deepsets_invariant_synth_custom2(**model_hyperparams),
     }

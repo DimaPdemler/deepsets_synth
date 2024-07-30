@@ -4,8 +4,11 @@
 import argparse
 import yaml
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fast_deepsets.deepsets.synthesize import main
+
+from fast_deepsets.deepsets.synthesize_custom import main
 
 
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
