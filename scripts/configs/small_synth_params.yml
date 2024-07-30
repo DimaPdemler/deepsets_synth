@@ -1,0 +1,76 @@
+Model:
+  Strategy: "Latency"
+
+LayerName:
+  input_layer:
+    Precision: "ap_fixed<12, 4, AP_RND, AP_SAT>"
+  
+  phi1:
+    ParallelizationFactor: 1
+    ReuseFactor: 2
+    Strategy: "Latency"
+    ConvImplementation: "Pointwise"
+  
+  phi_bn1:
+    ParallelizationFactor: 1
+    ReuseFactor: 1
+    Strategy: "Latency"
+  
+  phi_activ1:
+    Precision: "ap_fixed<16, 6, AP_RND, AP_SAT>"
+  
+  phi2:
+    ParallelizationFactor: 1
+    ReuseFactor: 2
+    Strategy: "Latency"
+    ConvImplementation: "Pointwise"
+  
+  phi_activ2:
+    Precision: "ap_fixed<16, 6, AP_RND, AP_SAT>"
+  
+  pre_aggreg_quant:
+    Precision: "ap_fixed<20, 10, AP_RND, AP_SAT>"
+  
+  global_average_pooling1d:
+    ParallelizationFactor: 1
+    ReuseFactor: 1
+    Strategy: "Latency"
+  
+  rho1:
+    ParallelizationFactor: 1
+    ReuseFactor: 2
+    Strategy: "Latency"
+    ConvImplementation: "Pointwise"
+  
+  rho_bn1:
+    ParallelizationFactor: 1
+    ReuseFactor: 1
+    Strategy: "Latency"
+  
+  rho_activ1:
+    Precision: "ap_fixed<16, 6, AP_RND, AP_SAT>"
+  
+  rho2:
+    ParallelizationFactor: 1
+    ReuseFactor: 2
+    Strategy: "Latency"
+    ConvImplementation: "Pointwise"
+  
+  rho_bn2:
+    ParallelizationFactor: 1
+    ReuseFactor: 1
+    Strategy: "Latency"
+  
+  rho_activ2:
+    Precision: "ap_fixed<16, 6, AP_RND, AP_SAT>"
+  
+  output_dense:
+    ParallelizationFactor: 1
+    ReuseFactor: 1
+    Strategy: "Latency"
+  
+  output_activ:
+    Precision: "ap_fixed<16, 6, AP_RND, AP_SAT>"
+
+  output_softmax:
+    Implementation: "Stable"
